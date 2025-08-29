@@ -183,6 +183,7 @@
         let currentQuizQuestion = 0;
         let quizTimer;
         let quizScore = 0;
+        window.currentQuiz = {}; // Store current question details
 
         recognition.onstart = () => {
             isListening = true;
@@ -244,6 +245,25 @@
             sadEmoji.textContent = '😢';
             feedbackContainer.appendChild(sadEmoji);
             setTimeout(() => sadEmoji.remove(), 1500);
+        }
+
+        // --- NEW: Personalized Feedback Logic ---
+        function generateFeedback(userAnswer, correctAnswer, question) {
+            const difference = Math.abs(correctAnswer - userAnswer);
+            const operator = question.question.includes('plus') ? 'addition' :
+                             question.question.includes('minus') ? 'subtraction' :
+                             question.question.includes('times') ? 'multiplication' : 'division';
+
+            if (isNaN(userAnswer)) {
+                 return `The correct answer was ${correctAnswer}. I didn't quite catch a number in your answer. Let's try another.`;
+            }
+            if (difference <= 2 && difference > 0) {
+                return `You are very close! The correct answer was ${correctAnswer}. It looks like a small calculation error. Let's try the next one.`;
+            } else if (userAnswer > correctAnswer && operator === 'subtraction') {
+                return `The correct answer was ${correctAnswer}. It looks like you might have added instead of subtracting. Keep an eye on the operator!`;
+            } else {
+                return `The correct answer was ${correctAnswer}. It might be helpful to practice your ${operator}. You've got this!`;
+            }
         }
 
         // --- Core Logic ---
@@ -326,14 +346,14 @@
             appState = 'inQuiz';
             currentQuizQuestion = 0;
             quizScore = 0;
-            speak(`Starting the ${quizDifficulty} challenge! 10 questions, 20 seconds each. Let's begin.`, false);
-            setTimeout(askQuizQuestion, 4000); // Give user time to prepare
+            speak(`Starting the ${quizDifficulty} challenge! 10 questions, 10 seconds each. Let's begin.`, false);
+            setTimeout(askQuizQuestion, 4000);
         }
 
         function askQuizQuestion() {
             if (currentQuizQuestion < 10) {
                 const q = generateQuizQuestion(quizDifficulty);
-                window.currentQuizAnswer = q.answer;
+                window.currentQuiz = q; // Store the whole question object
                 speak(q.question, true);
                 userQueryDisplay.textContent = q.question;
                 startTimer();
@@ -343,7 +363,7 @@
         }
         
         function startTimer() {
-            let timeLeft = 20;
+            let timeLeft = 10; // MODIFIED: Timer set to 10 seconds
             timerDisplay.textContent = timeLeft;
             clearInterval(quizTimer);
             quizTimer = setInterval(() => {
@@ -352,9 +372,9 @@
                 if (timeLeft <= 0) {
                     clearInterval(quizTimer);
                     showSadEmoji();
-                    speak(`Time's up! The answer was ${window.currentQuizAnswer}.`, false);
+                    speak(`Time's up! The correct answer was ${window.currentQuiz.answer}.`, false);
                     currentQuizQuestion++;
-                    setTimeout(askQuizQuestion, 2000);
+                    setTimeout(askQuizQuestion, 2500);
                 }
             }, 1000);
         }
@@ -363,17 +383,21 @@
             clearInterval(quizTimer);
             const numbersInAnswer = userAnswer.match(/-?\d+/g);
             const answerAsNumber = numbersInAnswer ? parseInt(numbersInAnswer[0]) : NaN;
+            const correctAnswer = window.currentQuiz.answer;
 
-            if (answerAsNumber === window.currentQuizAnswer) {
+            if (answerAsNumber === correctAnswer) {
                 quizScore++;
                 showHearts();
                 speak("Correct!", false);
             } else {
                 showSadEmoji();
-                speak(`Not quite. The correct answer was ${window.currentQuizAnswer}.`, false);
+                // MODIFIED: Call the new feedback function
+                const feedback = generateFeedback(answerAsNumber, correctAnswer, window.currentQuiz);
+                speak(feedback, false);
             }
             currentQuizQuestion++;
-            setTimeout(askQuizQuestion, 2000); // Wait 2 seconds before next question
+            // Increased delay to allow user to hear the feedback
+            setTimeout(askQuizQuestion, 3500); 
         }
         
         function endQuiz() {
