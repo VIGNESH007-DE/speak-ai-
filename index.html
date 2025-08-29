@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Socratic - Voice Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.5.0/math.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -218,10 +217,10 @@
             userQueryDisplay.textContent = "Sorry, I didn't catch that.";
         };
 
-        recognition.onresult = (event) => {
+        recognition.onresult = async (event) => {
             const transcript = event.results[0][0].transcript;
             userQueryDisplay.textContent = `You said: "${transcript}"`;
-            processQuery(transcript);
+            await processQuery(transcript);
         };
 
         function speak(text, callback) {
@@ -238,7 +237,6 @@
         }
 
         // --- Core Logic ---
-        // MODIFICATION: Replaced quiz with YouTube playlist
         const youtubePlaylist = [
             "https://www.youtube.com/shorts/hJ91_sn3-e4", // Fast Multiplication
             "https://www.youtube.com/shorts/2iNag44_9gY", // Percentage Trick
@@ -246,7 +244,7 @@
         ];
         let videoIndex = 0;
 
-        function processQuery(query) {
+        async function processQuery(query) {
             const lowerQuery = query.toLowerCase();
 
             if (lowerQuery.includes("bored")) {
@@ -254,50 +252,60 @@
                 return;
             }
             
-            // MODIFICATION: Removed quiz/analyze me functionality
             const mathKeywords = ['what is', 'calculate', 'solve', 'plus', 'minus', 'times', 'divided by', 'power', '+', '-', '*', '/'];
             const isMathQuery = mathKeywords.some(kw => lowerQuery.includes(kw)) || /\d/.test(lowerQuery);
 
             if (isMathQuery) {
-                solveMath(lowerQuery);
+                // MODIFICATION: Call Gemini API instead of local solver
+                await callGeminiApi(lowerQuery);
             } else {
                 speak("I can only answer math-related questions. Please ask me something like 'what is 5 times 12'.");
             }
         }
 
-        function solveMath(query) {
+        // MODIFICATION: New function to call Gemini API
+        async function callGeminiApi(query) {
+            const apiKey = "AIzaSyBoXwQ4i91HBFukPknxb6WM-13pJJ0s98U"; // This will be handled by the environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            
+            const systemPrompt = `You are Socratic, a helpful math assistant. Your only task is to solve the mathematical expression or question provided by the user. 
+            1. First, state the answer clearly.
+            2. Then, provide a very brief, one-sentence explanation of the method if the question is complex (like algebra or calculus). For simple arithmetic, just give the answer.
+            3. Your entire response must be spoken as a single, natural sentence.
+            Example 1 (Simple): User says "what is 5 times 5". You respond "The answer is 25."
+            Example 2 (Complex): User says "what is the integral of 2x". You respond "The integral of 2x is x squared plus a constant, which is found by applying the power rule."
+            Do not say "Sure!" or any other conversational fillers.`;
+
+            const payload = {
+                contents: [{ parts: [{ text: query }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
             try {
-                let expression = query
-                    .replace(/what is/g, '').replace(/calculate/g, '').replace(/solve/g, '')
-                    .replace(/plus/g, '+').replace(/minus/g, '-').replace(/times/g, '*')
-                    .replace(/divided by/g, '/').replace(/to the power of/g, '^')
-                    .replace(/one-half/g, '1/2').replace(/a half/g, '1/2')
-                    .replace(/one-third/g, '1/3').replace(/a third/g, '1/3')
-                    .replace(/one-fourth/g, '1/4').replace(/a fourth/g, '1/4').replace(/a quarter/g, '1/4')
-                    .trim();
-                
-                expression = expression.replace(/[^0-9\+\-\*\/\^\.\(\)\s]/g, '');
-
-                if (expression) {
-                    const result = math.evaluate(expression);
-                    speak(`The answer is ${result}.`);
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts) {
+                    const botResponse = result.candidates[0].content.parts[0].text;
+                    speak(botResponse);
                 } else {
-                    throw new Error("No valid math expression found.");
+                    speak("I'm sorry, I couldn't process that request.");
                 }
-
             } catch (error) {
-                console.error("Math evaluation error:", error);
-                speak("I'm sorry, I couldn't solve that. Please try rephrasing the problem.");
+                console.error("Gemini API Error:", error);
+                speak("I'm having a little trouble connecting to my brain right now. Please try again in a moment.");
             }
         }
         
-        // MODIFICATION: New function to recommend videos
         function recommendVideo() {
             const videoUrl = youtubePlaylist[videoIndex];
             speak("Feeling bored? Here is a link to a short video with a cool math trick.");
             userQueryDisplay.innerHTML = `Recommendation: <a href="${videoUrl}" target="_blank" class="text-blue-400 underline">Watch this Math Short!</a>`;
             
-            // Cycle to the next video for next time
             videoIndex = (videoIndex + 1) % youtubePlaylist.length;
         }
 
