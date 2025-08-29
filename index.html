@@ -73,6 +73,12 @@
             0%, 100% { box-shadow: 0 0 20px #22c55e; }
             50% { box-shadow: 0 0 40px #86efac; }
         }
+        #timer-display {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #f59e0b; /* Amber */
+            text-shadow: 0 0 15px #f59e0b;
+        }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center h-screen p-4">
@@ -89,6 +95,7 @@
     </div>
 
     <div id="status-display" class="text-center h-24">
+        <div id="timer-display" class="h-12"></div>
         <p id="user-query" class="text-xl text-gray-400 h-1/2"></p>
         <p id="bot-answer" class="text-2xl font-bold text-white h-1/2"></p>
     </div>
@@ -107,27 +114,17 @@
         const activateBtn = document.getElementById('activate-btn');
         const userQueryDisplay = document.getElementById('user-query');
         const botAnswerDisplay = document.getElementById('bot-answer');
+        const timerDisplay = document.getElementById('timer-display');
 
         // --- Background Animation ---
         const ctx = backgroundCanvas.getContext('2d');
         backgroundCanvas.width = window.innerWidth;
         backgroundCanvas.height = window.innerHeight;
         let particles = [];
-        const mouse = { x: null, y: null, radius: 100 };
-
-        window.addEventListener('mousemove', (event) => {
-            mouse.x = event.x;
-            mouse.y = event.y;
-        });
-        window.addEventListener('mouseout', () => {
-            mouse.x = null;
-            mouse.y = null;
-        });
 
         class Particle {
             constructor(x, y, directionX, directionY, size, color) {
-                this.x = x; this.y = y;
-                this.directionX = directionX; this.directionY = directionY;
+                this.x = x; this.y = y; this.directionX = directionX; this.directionY = directionY;
                 this.size = size; this.color = color;
             }
             draw() {
@@ -198,7 +195,12 @@
         recognition.interimResults = false;
         
         let isListening = false;
-        
+        let appState = 'idle'; // 'idle', 'awaitingDifficulty', 'inQuiz'
+        let quizDifficulty = null;
+        let currentQuizQuestion = null;
+        let quizTimer;
+        let quizScore = 0;
+
         recognition.onstart = () => {
             isListening = true;
             activateBtn.classList.add('listening');
@@ -209,7 +211,9 @@
         recognition.onend = () => {
             isListening = false;
             activateBtn.classList.remove('listening');
-            userQueryDisplay.textContent = "Click the mic to ask a question";
+            if (appState === 'idle') {
+                userQueryDisplay.textContent = "Say 'Start' to begin your math speed test.";
+            }
         };
         
         recognition.onerror = (event) => {
@@ -225,9 +229,7 @@
 
         function speak(text, callback) {
             const utterance = new SpeechSynthesisUtterance(text);
-            utterance.onstart = () => {
-                gsap.to(socraticBot, { scale: 1.1, duration: 0.3, ease: 'power2.out' });
-            };
+            utterance.onstart = () => gsap.to(socraticBot, { scale: 1.1, duration: 0.3, ease: 'power2.out' });
             utterance.onend = () => {
                 gsap.to(socraticBot, { scale: 1, duration: 0.5, ease: 'elastic.out(1, 0.3)' });
                 if (callback) callback();
@@ -237,76 +239,144 @@
         }
 
         // --- Core Logic ---
-        const youtubePlaylist = [
-            "https://www.youtube.com/shorts/hJ91_sn3-e4", // Fast Multiplication
-            "https://www.youtube.com/shorts/2iNag44_9gY", // Percentage Trick
-            "https://www.youtube.com/shorts/EIe-Z22_3XU"  // Squaring numbers ending in 5
-        ];
-        let videoIndex = 0;
-
         async function processQuery(query) {
             const lowerQuery = query.toLowerCase();
 
-            if (lowerQuery.includes("bored")) {
-                recommendVideo();
-                return;
-            }
-            
-            const mathKeywords = ['what is', 'calculate', 'solve', 'plus', 'minus', 'times', 'divided by', 'power', '+', '-', '*', '/'];
-            const isMathQuery = mathKeywords.some(kw => lowerQuery.includes(kw)) || /\d/.test(lowerQuery);
-
-            if (isMathQuery) {
-                // MODIFICATION: Call Gemini API instead of local solver
-                await callGeminiApi(lowerQuery);
-            } else {
-                speak("I can only answer math-related questions. Please ask me something like 'what is 5 times 12'.");
-            }
-        }
-
-        // MODIFICATION: New function to call Gemini API
-        async function callGeminiApi(query) {
-            const apiKey = "AIzaSyBoXwQ4i91HBFukPknxb6WM-13pJJ0s98U"; // This will be handled by the environment
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-            
-            const systemPrompt = `You are Socratic, a helpful math assistant. Your only task is to solve the mathematical expression or question provided by the user. 
-            1. First, state the answer clearly.
-            2. Then, provide a very brief, one-sentence explanation of the method if the question is complex (like algebra or calculus). For simple arithmetic, just give the answer.
-            3. Your entire response must be spoken as a single, natural sentence.
-            Example 1 (Simple): User says "what is 5 times 5". You respond "The answer is 25."
-            Example 2 (Complex): User says "what is the integral of 2x". You respond "The integral of 2x is x squared plus a constant, which is found by applying the power rule."
-            Do not say "Sure!" or any other conversational fillers.`;
-
-            const payload = {
-                contents: [{ parts: [{ text: query }] }],
-                systemInstruction: { parts: [{ text: systemPrompt }] },
-            };
-
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (!response.ok) throw new Error(`API Error: ${response.status}`);
-                const result = await response.json();
-                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts) {
-                    const botResponse = result.candidates[0].content.parts[0].text;
-                    speak(botResponse);
-                } else {
-                    speak("I'm sorry, I couldn't process that request.");
-                }
-            } catch (error) {
-                console.error("Gemini API Error:", error);
-                speak("I'm having a little trouble connecting to my brain right now. Please try again in a moment.");
+            switch (appState) {
+                case 'idle':
+                    // MODIFICATION: Added "start" as a trigger word
+                    if (lowerQuery.includes("analyze me") || lowerQuery.includes("quiz me") || lowerQuery.includes("start")) {
+                        appState = 'awaitingDifficulty';
+                        speak("Which level would you like to try? Beginner, intermediate, or hard?");
+                    } else {
+                        speak("Say 'Start' to begin your math speed test.");
+                    }
+                    break;
+                case 'awaitingDifficulty':
+                    if (lowerQuery.includes("beginner")) {
+                        quizDifficulty = 'beginner';
+                        startQuiz();
+                    } else if (lowerQuery.includes("intermediate")) {
+                        quizDifficulty = 'intermediate';
+                        startQuiz();
+                    } else if (lowerQuery.includes("hard")) {
+                        quizDifficulty = 'hard';
+                        startQuiz();
+                    } else {
+                        speak("Please choose beginner, intermediate, or hard.");
+                    }
+                    break;
+                case 'inQuiz':
+                    checkQuizAnswer(lowerQuery);
+                    break;
             }
         }
         
-        function recommendVideo() {
-            const videoUrl = youtubePlaylist[videoIndex];
-            speak("Feeling bored? Here is a link to a short video with a cool math trick.");
-            userQueryDisplay.innerHTML = `Recommendation: <a href="${videoUrl}" target="_blank" class="text-blue-400 underline">Watch this Math Short!</a>`;
-            
-            videoIndex = (videoIndex + 1) % youtubePlaylist.length;
+        // --- Quiz Mode Logic ---
+        function generateQuizQuestion(difficulty) {
+            let num1, num2, question, answer;
+            switch(difficulty) {
+                case 'beginner':
+                    num1 = Math.floor(Math.random() * 20) + 1;
+                    num2 = Math.floor(Math.random() * 20) + 1;
+                    question = `What is ${num1} plus ${num2}?`;
+                    answer = num1 + num2;
+                    break;
+                case 'intermediate':
+                    const op = ['-', '*'][Math.floor(Math.random() * 2)];
+                    if (op === '-') {
+                        num1 = Math.floor(Math.random() * 80) + 20;
+                        num2 = Math.floor(Math.random() * 20) + 1;
+                        question = `What is ${num1} minus ${num2}?`;
+                        answer = num1 - num2;
+                    } else {
+                        num1 = Math.floor(Math.random() * 11) + 2; // 2-12
+                        num2 = Math.floor(Math.random() * 11) + 2; // 2-12
+                        question = `What is ${num1} times ${num2}?`;
+                        answer = num1 * num2;
+                    }
+                    break;
+                case 'hard':
+                    const hardOp = ['/', 'fraction'][Math.floor(Math.random() * 2)];
+                    if (hardOp === '/') {
+                        answer = Math.floor(Math.random() * 10) + 2;
+                        num2 = Math.floor(Math.random() * 10) + 3;
+                        num1 = answer * num2;
+                        question = `What is ${num1} divided by ${num2}?`;
+                    } else {
+                        const den = [2, 4, 5, 10][Math.floor(Math.random() * 4)];
+                        const mult = Math.floor(Math.random() * 10) + 2;
+                        const num = den * mult;
+                        question = `What is one-${den === 2 ? 'half' : (den === 4 ? 'fourth' : 'fifth')} of ${num}?`;
+                        answer = mult;
+                    }
+                    break;
+            }
+            return { question, answer };
+        }
+
+        function startQuiz() {
+            appState = 'inQuiz';
+            currentQuizQuestion = 0;
+            quizScore = 0;
+            speak(`Starting the ${quizDifficulty} challenge! 10 questions, 20 seconds each. Let's begin.`, askQuizQuestion);
+        }
+
+        function askQuizQuestion() {
+            if (currentQuizQuestion < 10) {
+                const q = generateQuizQuestion(quizDifficulty);
+                window.currentQuizAnswer = q.answer;
+                speak(q.question);
+                userQueryDisplay.textContent = q.question;
+                startTimer();
+            } else {
+                endQuiz();
+            }
+        }
+        
+        function startTimer() {
+            let timeLeft = 20;
+            timerDisplay.textContent = timeLeft;
+            clearInterval(quizTimer);
+            quizTimer = setInterval(() => {
+                timeLeft--;
+                timerDisplay.textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(quizTimer);
+                    speak(`Time's up! The answer was ${window.currentQuizAnswer}.`, () => {
+                        currentQuizQuestion++;
+                        askQuizQuestion();
+                    });
+                }
+            }, 1000);
+        }
+
+        function checkQuizAnswer(userAnswer) {
+            clearInterval(quizTimer);
+            const numbersInAnswer = userAnswer.match(/-?\d+/g); // handle negative numbers
+            const answerAsNumber = numbersInAnswer ? parseInt(numbersInAnswer[0]) : NaN;
+
+            if (answerAsNumber === window.currentQuizAnswer) {
+                quizScore++;
+                speak("Correct!", () => {
+                    currentQuizQuestion++;
+                    askQuizQuestion();
+                });
+            } else {
+                speak(`Not quite. The correct answer was ${window.currentQuizAnswer}.`, () => {
+                    currentQuizQuestion++;
+                    askQuizQuestion();
+                });
+            }
+        }
+        
+        function endQuiz() {
+            appState = 'idle';
+            quizDifficulty = null;
+            currentQuizQuestion = null;
+            timerDisplay.textContent = '';
+            speak(`Quiz complete! You scored ${quizScore} out of 10. Well done!`);
+            userQueryDisplay.textContent = "Quiz finished! Say 'Start' to begin a new test.";
         }
 
         // --- Event Listeners ---
@@ -315,6 +385,9 @@
                 recognition.start();
             }
         });
+        
+        // Initial welcome message
+        speak("Hello! I am Socratic. Say 'Start' to begin your math speed test.");
 
     </script>
 </body>
