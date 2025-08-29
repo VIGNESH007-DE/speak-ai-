@@ -12,50 +12,52 @@
     <style>
         body {
             font-family: 'Roboto Mono', monospace;
-            background: #0a0a0a;
+            background: linear-gradient(-45deg, #0f0c29, #302b63, #24243e, #4f46e5);
+            background-size: 400% 400%;
+            animation: background-pan 15s ease infinite;
             color: #e0e0e0;
+            overflow: hidden;
         }
-        #background-canvas {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
+
+        @keyframes background-pan {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
+
         #socratic-bot {
-            width: 200px;
-            height: 200px;
+            width: 150px; /* Adjusted for better mobile layout */
+            height: 150px;
             position: relative;
             transition: transform 0.5s ease-in-out;
         }
         .bot-core {
-            width: 100px;
-            height: 100px;
+            width: 75px; /* Adjusted */
+            height: 75px;
             background: radial-gradient(circle, #4f46e5 0%, #1e1b4b 100%);
             border-radius: 50%;
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            box-shadow: 0 0 30px #4f46e5, inset 0 0 20px rgba(255,255,255,0.3);
+            box-shadow: 0 0 25px #4f46e5, inset 0 0 15px rgba(255,255,255,0.3);
             animation: pulse 4s ease-in-out infinite;
         }
         .bot-ring {
             position: absolute;
             top: 50%;
             left: 50%;
-            border: 3px solid;
+            border: 2px solid; /* Adjusted */
             border-radius: 50%;
             transform: translate(-50%, -50%);
             opacity: 0.5;
         }
-        .ring1 { width: 150px; height: 150px; border-color: #a78bfa; animation: rotate 20s linear infinite; }
-        .ring2 { width: 180px; height: 180px; border-color: #7c3aed; animation: rotate-reverse 25s linear infinite; }
-        .ring3 { width: 210px; height: 210px; border-color: #6d28d9; animation: rotate 30s linear infinite; }
+        .ring1 { width: 110px; height: 110px; border-color: #a78bfa; animation: rotate 20s linear infinite; }
+        .ring2 { width: 130px; height: 130px; border-color: #7c3aed; animation: rotate-reverse 25s linear infinite; }
+        .ring3 { width: 150px; height: 150px; border-color: #6d28d9; animation: rotate 30s linear infinite; }
         
         @keyframes pulse {
-            50% { box-shadow: 0 0 45px #6366f1, inset 0 0 25px rgba(255,255,255,0.4); }
+            50% { box-shadow: 0 0 40px #6366f1, inset 0 0 20px rgba(255,255,255,0.4); }
         }
         @keyframes rotate {
             from { transform: translate(-50%, -50%) rotate(0deg); }
@@ -74,118 +76,99 @@
             50% { box-shadow: 0 0 40px #86efac; }
         }
         #timer-display {
-            font-size: 3rem;
+            font-size: 2.5rem; /* Adjusted */
             font-weight: 700;
-            color: #f59e0b; /* Amber */
+            color: #f59e0b;
             text-shadow: 0 0 15px #f59e0b;
+        }
+        
+        /* --- Layout and Text Display Fixes --- */
+        #main-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; /* Pushes content apart */
+            align-items: center;
+            height: 100vh;
+            padding: 1rem;
+        }
+        #status-display {
+            min-height: 8rem; /* Allows text to wrap without overlap */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* --- Feedback Animations --- */
+        #feedback-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 100;
+        }
+        .heart {
+            position: absolute;
+            font-size: 2rem;
+            animation: float-up 3s ease-out forwards;
+        }
+        @keyframes float-up {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-100vh) scale(1.5); opacity: 0; }
+        }
+        .sad-emoji {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            font-size: 8rem;
+            opacity: 0;
+            animation: pop-up 1.5s ease-out forwards;
+        }
+        @keyframes pop-up {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
         }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center h-screen p-4">
+<body>
 
-    <canvas id="background-canvas"></canvas>
+    <div id="feedback-container"></div>
 
-    <div id="socratic-bot-container" class="mb-8">
-        <div id="socratic-bot">
-            <div class="bot-core"></div>
-            <div class="bot-ring ring1"></div>
-            <div class="bot-ring ring2"></div>
-            <div class="bot-ring ring3"></div>
+    <div id="main-container">
+        <div id="socratic-bot-container">
+            <div id="socratic-bot">
+                <div class="bot-core"></div>
+                <div class="bot-ring ring1"></div>
+                <div class="bot-ring ring2"></div>
+                <div class="bot-ring ring3"></div>
+            </div>
         </div>
-    </div>
 
-    <div id="status-display" class="text-center h-24">
-        <div id="timer-display" class="h-12"></div>
-        <p id="user-query" class="text-xl text-gray-400 h-1/2"></p>
-        <p id="bot-answer" class="text-2xl font-bold text-white h-1/2"></p>
-    </div>
+        <div id="status-display" class="text-center">
+            <div id="timer-display" class="mb-2"></div>
+            <p id="user-query" class="text-lg text-gray-400"></p>
+            <p id="bot-answer" class="text-xl font-bold text-white"></p>
+        </div>
 
-    <button id="activate-btn" class="mt-8 bg-green-600 text-white rounded-full p-6 transition-all duration-300 hover:bg-green-500 focus:outline-none shadow-lg">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm5 8a1 1 0 100-2H8a1 1 0 100 2h4zM3 8a1 1 0 011-1h1v2H4a1 1 0 01-1-1zm13 0a1 1 0 00-1-1h-1v2h1a1 1 0 001-1z" clip-rule="evenodd" />
-            <path d="M10 18a5 5 0 005-5h-2a3 3 0 01-6 0H5a5 5 0 005 5z" />
-        </svg>
-    </button>
+        <button id="activate-btn" class="bg-green-600 text-white rounded-full p-5 transition-all duration-300 hover:bg-green-500 focus:outline-none shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm5 8a1 1 0 100-2H8a1 1 0 100 2h4zM3 8a1 1 0 011-1h1v2H4a1 1 0 01-1-1zm13 0a1 1 0 00-1-1h-1v2h1a1 1 0 001-1z" clip-rule="evenodd" />
+                <path d="M10 18a5 5 0 005-5h-2a3 3 0 01-6 0H5a5 5 0 005 5z" />
+            </svg>
+        </button>
+    </div>
 
     <script>
         // --- DOM Elements ---
-        const backgroundCanvas = document.getElementById('background-canvas');
         const socraticBot = document.getElementById('socratic-bot');
         const activateBtn = document.getElementById('activate-btn');
         const userQueryDisplay = document.getElementById('user-query');
         const botAnswerDisplay = document.getElementById('bot-answer');
         const timerDisplay = document.getElementById('timer-display');
-
-        // --- Background Animation ---
-        const ctx = backgroundCanvas.getContext('2d');
-        backgroundCanvas.width = window.innerWidth;
-        backgroundCanvas.height = window.innerHeight;
-        let particles = [];
-
-        class Particle {
-            constructor(x, y, directionX, directionY, size, color) {
-                this.x = x; this.y = y; this.directionX = directionX; this.directionY = directionY;
-                this.size = size; this.color = color;
-            }
-            draw() {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
-                ctx.fillStyle = this.color;
-                ctx.fill();
-            }
-            update() {
-                if (this.x > backgroundCanvas.width || this.x < 0) this.directionX = -this.directionX;
-                if (this.y > backgroundCanvas.height || this.y < 0) this.directionY = -this.directionY;
-                this.x += this.directionX;
-                this.y += this.directionY;
-                this.draw();
-            }
-        }
-
-        function initParticles() {
-            particles = [];
-            let numberOfParticles = (backgroundCanvas.height * backgroundCanvas.width) / 9000;
-            for (let i = 0; i < numberOfParticles; i++) {
-                let size = (Math.random() * 2) + 1;
-                let x = (Math.random() * ((innerWidth - size * 2) - (size * 2)) + size * 2);
-                let y = (Math.random() * ((innerHeight - size * 2) - (size * 2)) + size * 2);
-                let directionX = (Math.random() * .4) - .2;
-                let directionY = (Math.random() * .4) - .2;
-                let color = `rgba(79, 70, 229, ${Math.random()})`;
-                particles.push(new Particle(x, y, directionX, directionY, size, color));
-            }
-        }
-
-        function connectParticles() {
-            for (let a = 0; a < particles.length; a++) {
-                for (let b = a; b < particles.length; b++) {
-                    let distance = Math.hypot(particles[a].x - particles[b].x, particles[a].y - particles[b].y);
-                    if (distance < (backgroundCanvas.width/7) * (backgroundCanvas.height/7) / 100) {
-                        ctx.strokeStyle=`rgba(129, 140, 248, ${1 - distance/200})`;
-                        ctx.lineWidth = 1;
-                        ctx.beginPath();
-                        ctx.moveTo(particles[a].x, particles[a].y);
-                        ctx.lineTo(particles[b].x, particles[b].y);
-                        ctx.stroke();
-                    }
-                }
-            }
-        }
-
-        function animateBackground() {
-            requestAnimationFrame(animateBackground);
-            ctx.clearRect(0,0,innerWidth, innerHeight);
-            particles.forEach(p => p.update());
-            connectParticles();
-        }
-        
-        initParticles();
-        animateBackground();
-        window.addEventListener('resize', () => {
-            backgroundCanvas.width = window.innerWidth;
-            backgroundCanvas.height = window.innerHeight;
-            initParticles();
-        });
+        const feedbackContainer = document.getElementById('feedback-container');
 
         // --- Voice Recognition & Synthesis ---
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -197,7 +180,7 @@
         let isListening = false;
         let appState = 'idle'; // 'idle', 'awaitingDifficulty', 'inQuiz'
         let quizDifficulty = null;
-        let currentQuizQuestion = null;
+        let currentQuizQuestion = 0;
         let quizTimer;
         let quizScore = 0;
 
@@ -211,14 +194,14 @@
         recognition.onend = () => {
             isListening = false;
             activateBtn.classList.remove('listening');
-            if (appState === 'idle') {
-                userQueryDisplay.textContent = "Say 'Start' to begin your math speed test.";
+            if (userQueryDisplay.textContent === "Listening...") {
+                userQueryDisplay.textContent = "I didn't hear anything.";
             }
         };
         
         recognition.onerror = (event) => {
             console.error("Speech recognition error:", event.error);
-            userQueryDisplay.textContent = "Sorry, I didn't catch that.";
+            userQueryDisplay.textContent = "Sorry, I had trouble hearing.";
         };
 
         recognition.onresult = async (event) => {
@@ -227,15 +210,40 @@
             await processQuery(transcript);
         };
 
-        function speak(text, callback) {
+        function speak(text, shouldListenAfter = false) {
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.onstart = () => gsap.to(socraticBot, { scale: 1.1, duration: 0.3, ease: 'power2.out' });
             utterance.onend = () => {
                 gsap.to(socraticBot, { scale: 1, duration: 0.5, ease: 'elastic.out(1, 0.3)' });
-                if (callback) callback();
+                if (shouldListenAfter && !isListening) {
+                    recognition.start();
+                }
             };
             speechSynthesis.speak(utterance);
             botAnswerDisplay.textContent = text;
+        }
+
+        // --- Feedback Animations ---
+        function showHearts() {
+            for (let i = 0; i < 15; i++) {
+                setTimeout(() => {
+                    const heart = document.createElement('div');
+                    heart.classList.add('heart');
+                    heart.textContent = '❤️';
+                    heart.style.left = `${Math.random() * 100}vw`;
+                    heart.style.animationDuration = `${(Math.random() * 2) + 2}s`;
+                    feedbackContainer.appendChild(heart);
+                    setTimeout(() => heart.remove(), 4000);
+                }, i * 100);
+            }
+        }
+
+        function showSadEmoji() {
+            const sadEmoji = document.createElement('div');
+            sadEmoji.classList.add('sad-emoji');
+            sadEmoji.textContent = '😢';
+            feedbackContainer.appendChild(sadEmoji);
+            setTimeout(() => sadEmoji.remove(), 1500);
         }
 
         // --- Core Logic ---
@@ -244,10 +252,9 @@
 
             switch (appState) {
                 case 'idle':
-                    // MODIFICATION: Added "start" as a trigger word
-                    if (lowerQuery.includes("analyze me") || lowerQuery.includes("quiz me") || lowerQuery.includes("start")) {
+                    if (lowerQuery.includes("start")) {
                         appState = 'awaitingDifficulty';
-                        speak("Which level would you like to try? Beginner, intermediate, or hard?");
+                        speak("Which level would you like to try? Beginner, intermediate, or hard?", true);
                     } else {
                         speak("Say 'Start' to begin your math speed test.");
                     }
@@ -263,7 +270,7 @@
                         quizDifficulty = 'hard';
                         startQuiz();
                     } else {
-                        speak("Please choose beginner, intermediate, or hard.");
+                        speak("Please choose beginner, intermediate, or hard.", true);
                     }
                     break;
                 case 'inQuiz':
@@ -290,8 +297,8 @@
                         question = `What is ${num1} minus ${num2}?`;
                         answer = num1 - num2;
                     } else {
-                        num1 = Math.floor(Math.random() * 11) + 2; // 2-12
-                        num2 = Math.floor(Math.random() * 11) + 2; // 2-12
+                        num1 = Math.floor(Math.random() * 11) + 2;
+                        num2 = Math.floor(Math.random() * 11) + 2;
                         question = `What is ${num1} times ${num2}?`;
                         answer = num1 * num2;
                     }
@@ -319,14 +326,15 @@
             appState = 'inQuiz';
             currentQuizQuestion = 0;
             quizScore = 0;
-            speak(`Starting the ${quizDifficulty} challenge! 10 questions, 20 seconds each. Let's begin.`, askQuizQuestion);
+            speak(`Starting the ${quizDifficulty} challenge! 10 questions, 20 seconds each. Let's begin.`, false);
+            setTimeout(askQuizQuestion, 4000); // Give user time to prepare
         }
 
         function askQuizQuestion() {
             if (currentQuizQuestion < 10) {
                 const q = generateQuizQuestion(quizDifficulty);
                 window.currentQuizAnswer = q.answer;
-                speak(q.question);
+                speak(q.question, true);
                 userQueryDisplay.textContent = q.question;
                 startTimer();
             } else {
@@ -343,37 +351,35 @@
                 timerDisplay.textContent = timeLeft;
                 if (timeLeft <= 0) {
                     clearInterval(quizTimer);
-                    speak(`Time's up! The answer was ${window.currentQuizAnswer}.`, () => {
-                        currentQuizQuestion++;
-                        askQuizQuestion();
-                    });
+                    showSadEmoji();
+                    speak(`Time's up! The answer was ${window.currentQuizAnswer}.`, false);
+                    currentQuizQuestion++;
+                    setTimeout(askQuizQuestion, 2000);
                 }
             }, 1000);
         }
 
         function checkQuizAnswer(userAnswer) {
             clearInterval(quizTimer);
-            const numbersInAnswer = userAnswer.match(/-?\d+/g); // handle negative numbers
+            const numbersInAnswer = userAnswer.match(/-?\d+/g);
             const answerAsNumber = numbersInAnswer ? parseInt(numbersInAnswer[0]) : NaN;
 
             if (answerAsNumber === window.currentQuizAnswer) {
                 quizScore++;
-                speak("Correct!", () => {
-                    currentQuizQuestion++;
-                    askQuizQuestion();
-                });
+                showHearts();
+                speak("Correct!", false);
             } else {
-                speak(`Not quite. The correct answer was ${window.currentQuizAnswer}.`, () => {
-                    currentQuizQuestion++;
-                    askQuizQuestion();
-                });
+                showSadEmoji();
+                speak(`Not quite. The correct answer was ${window.currentQuizAnswer}.`, false);
             }
+            currentQuizQuestion++;
+            setTimeout(askQuizQuestion, 2000); // Wait 2 seconds before next question
         }
         
         function endQuiz() {
             appState = 'idle';
             quizDifficulty = null;
-            currentQuizQuestion = null;
+            currentQuizQuestion = 0;
             timerDisplay.textContent = '';
             speak(`Quiz complete! You scored ${quizScore} out of 10. Well done!`);
             userQueryDisplay.textContent = "Quiz finished! Say 'Start' to begin a new test.";
